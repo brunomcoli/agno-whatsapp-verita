@@ -80,7 +80,12 @@ Clique no botão **Deploy on Railway** no topo deste README.
 
 A Railway provisiona automaticamente:
 - o serviço do app (a partir do `Dockerfile`)
-- um PostgreSQL com pgvector
+- um PostgreSQL (template `postgres-ssl`, com volume persistente)
+
+> O Postgres da Railway **nao** vem com pgvector; o `compose.yaml` local vem
+> (`agnohq/pgvector`). O agente nao precisa de pgvector pra funcionar. Se voce
+> ligar knowledge base (RAG) via `create_knowledge()`, troque o servico pelo
+> template **pgvector** da Railway antes.
 
 No painel Railway, nas variáveis de ambiente do serviço do app:
 
@@ -102,6 +107,12 @@ No painel Railway, nas variáveis de ambiente do serviço do app:
   DB_PASS=${{Postgres.PGPASSWORD}}
   DB_DATABASE=${{Postgres.PGDATABASE}}
   ```
+
+> **Escolha um dos dois, não os dois.** `DATABASE_URL` tem precedência sobre as
+> `DB_*`. Se você definir `DATABASE_URL` e deixar um `DB_HOST` antigo (ex.: `db`,
+> copiado do `.env.example`) nas variáveis da Railway, o container espera por um
+> host que não existe antes de subir o servidor e o healthcheck falha com
+> `service unavailable`. Apague o `DB_HOST` sobrando.
 
 Gere o domínio público em **Settings → Networking → Generate Domain** (no card do serviço do app, não no card do Postgres).
 
@@ -156,6 +167,9 @@ agno-whatsapp-starter/
 | Sintoma | Fix |
 |---|---|
 | `/health` não responde | Aguardar 30-60s no primeiro boot (pgvector subindo) |
+| Healthcheck falha com `service unavailable` e **não há log de runtime** | O app nunca abriu a porta. Veja **Deploy Logs** (não Build Logs). Quase sempre é `DB_HOST` conflitando com `DATABASE_URL`, ou o Postgres inacessível |
+| Boot trava vários minutos sem erro | `WAIT_FOR_DB=True` apontando pro host errado. A espera agora é limitada por `DB_WAIT_TIMEOUT` (padrão `45s`) |
+| `server closed the connection unexpectedly` depois de um tempo parado | Conexão ociosa derrubada. Já tratado com `pool_pre_ping` + `DB_POOL_RECYCLE` |
 | `openai_api_key Field required` no Railway | Defina `OPENAI_API_KEY` nas variáveis do serviço do app, não no serviço Postgres |
 | Erro de conexão com `localhost:5432` no Railway | Defina `DATABASE_URL=${{Postgres.DATABASE_URL}}` ou as `DB_*` como reference variables |
 | Handshake Meta retorna 403 | `WHATSAPP_VERIFY_TOKEN` do `.env` e do Meta precisam ser **idênticos** |

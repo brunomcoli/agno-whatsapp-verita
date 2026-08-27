@@ -48,10 +48,16 @@ if cors_allow_origins:
 agentos_db = get_postgres_db()
 repair_agentos_db_schema(agentos_db)
 
+# O poller do scheduler chama o proprio AgentOS por HTTP. Sem `scheduler_base_url`
+# o Agno assume http://127.0.0.1:7777, mas o uvicorn sobe em $PORT (8000 na
+# Railway), entao toda execucao agendada bateria numa porta fechada.
+scheduler_base_url = getenv("SCHEDULER_BASE_URL", f"http://127.0.0.1:{getenv('PORT', '8000')}")
+
 agent_os = AgentOS(
     name="AgentOS",
     tracing=True,
     scheduler=True,
+    scheduler_base_url=scheduler_base_url,
     base_app=base_app,
     db=agentos_db,
     agents=[my_agent],
